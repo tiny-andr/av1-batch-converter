@@ -250,8 +250,9 @@ onefile 用 zlib 压缩存档，`ffmpeg.exe` 102,856,192 → 37,508,450 字节�
 ### GPLv3 合规
 
 `vendor/ffmpeg/` 里同时放了 gyan 的 `LICENSE` 和 `README-ffmpeg.txt`，spec 把三个文件一起
-打进 exe 的 `ffmpeg\` 目录。gyan 的 README 里带着对应的源码指针
-（`https://github.com/FFmpeg/FFmpeg/commit/bf1b838f2a`），三份 README 都给了这个链接。
+打进 exe 的 `ffmpeg\` 目录，**许可信息随 exe 一起分发，所以三份 README 只需各自一句话点明
+"内置的 ffmpeg 是 GPLv3"**（用户把 README 删减成这个体量，详细的许可/源码说明只留在这里）。
+gyan 的 README 里带着对应的源码指针：`https://github.com/FFmpeg/FFmpeg/commit/bf1b838f2a`。
 
 ## 源码
 
@@ -420,6 +421,12 @@ Windows 用系统主题绘制、不理会 Tk 配色，深色下会露出一条�
 > **README 截图必须和 README 的语言一致**（用户 2026-09-17 指出）：英文 README 用英文界面截图、
 > 中文 README 用中文、日文 README 用日文，所以是 3 语言 × 2 主题 = 6 张图，
 > 文件名形如 `docs/screenshot-dark-en.png`。别再只出一份"系统语言"的图给三份 README 共用。
+
+> **README 只留最少的量**（用户 2026-09-17 删减后定的）：标题 → 一句话介绍 → 一张截图 →
+> 「功能」3 条 → 「运行要求」3 条 → 「输出」→ 「从源码构建」→ 「许可证」，三份合计 135 行。
+> ⚠️ **HiDPI、多语言、深色主题这类"程序本来就该做好的事"不算功能，不许写进功能列表**
+> （用户原话："hidpi 和多语言是一个程序自己该做的。这能写进功能里面？"）。
+> 加速设备表、画质说明、解析优先级、验证方法、坑位一律只留在本文档。
 
 改动配色后跑 `_screenshot_check.py`，改完打包再跑 `_verify_exe.py`、`_verify_exe_enc.py` 和 `_verify_exe_i18n.py`。
 只是改文案/日志这类**不动布局**的改动，跑 `_quiet_toggle_check.py` 就够了，不必惊动屏幕。
