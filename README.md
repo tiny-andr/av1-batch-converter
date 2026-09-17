@@ -27,13 +27,15 @@ file list in-process instead, so the limit does not apply.
 ## Requirements
 
 - Windows 10 or 11
-- [ffmpeg](https://ffmpeg.org/download.html) on your `PATH`
 - A GPU whose encoder ffmpeg can drive, if you want hardware acceleration
   (AV1 encoding needs a recent card: RTX 40 series, RX 7000 series, Arc, or newer)
 
+ffmpeg is **bundled inside the exe**, so there is nothing to install. See
+[Bundled ffmpeg](#bundled-ffmpeg).
+
 ## Usage
 
-There is no installer. Download `av1_batch_converter.exe` from
+There is no installer and no prerequisite. Download `av1_batch_converter.exe` from
 [Releases](../../releases) and run it.
 
 Add files in whichever way suits you:
@@ -70,6 +72,7 @@ The first usable device in this order is picked by default:
 | 2 | AMD GPU | `av1_amf` | `-quality quality -rc cqp -qp_i 28 -qp_p 28` |
 | 3 | Intel iGPU | `av1_qsv` | `-preset 7 -global_quality 28` |
 | 4 | CPU | `libsvtav1` | `-preset 6 -crf 30` |
+| 5 | CPU | `libaom-av1` | `-cpu-used 6 -crf 30` |
 
 Common to every device: `-g 240 -movflags +faststart -c:a aac -b:a 128k`
 
@@ -77,8 +80,14 @@ Common to every device: `-g 240 -movflags +faststart -c:a aac -b:a 128k`
 > and crf scales are not equivalent, so the numbers were chosen per encoder to land
 > in a similar visual range.
 
-CPU encoding with SVT-AV1 is one to two orders of magnitude slower than a GPU
-encoder. It is the fallback, and the log says so when it is selected.
+CPU encoding is one to two orders of magnitude slower than a GPU encoder. It is the
+fallback, and the log says so when it is selected.
+
+Two software encoders are listed because which one exists depends on the ffmpeg in
+use. SVT-AV1 is much faster and wins when it is there, which is why it is tried
+first; the bundled ffmpeg has `libaom-av1` only, so a stock install lands on row 5.
+Supply your own full ffmpeg build (see [Bundled ffmpeg](#bundled-ffmpeg)) to get
+row 4 instead.
 
 When the encoder changes, the log reprints the exact arguments in use:
 
@@ -87,6 +96,45 @@ When the encoder changes, the log reprints the exact arguments in use:
   quality    : -preset p7 -rc vbr -cq 28 -b:v 0 -tune hq
   common     : -g 240 -movflags +faststart -c:a aac -b:a 128k
 ```
+
+## Bundled ffmpeg
+
+The exe carries its own ffmpeg, so a fresh Windows install can transcode without
+setting anything up. It is looked for in this order, first hit wins:
+
+| Order | Location | Why |
+| --- | --- | --- |
+| 1 | `ffmpeg\ffmpeg.exe` beside the exe | Your own build overrides everything else |
+| 2 | Inside the exe | The default |
+| 3 | `ffmpeg` on your `PATH` | Only reached if neither of the above exists |
+
+The bundled copy deliberately beats a copy on `PATH`: a machine-wide ffmpeg is
+easy to forget about, and "works on my machine" bugs are worse than a predictable
+default. The first two lines of the log always say which one answered:
+
+```
+ffmpeg: bundled with the program
+ffmpeg version: ffmpeg version 9.0.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers
+```
+
+The bundled binary is [gyan.dev](https://www.gyan.dev/ffmpeg/builds/)'s essentials
+build 9.0.1, included unmodified. It is **GPLv3**, so its licence and build notes
+ship inside the exe as `ffmpeg\LICENSE` and `ffmpeg\README-ffmpeg.txt`, and the
+matching source is
+[FFmpeg commit bf1b838f2a](https://github.com/FFmpeg/FFmpeg/commit/bf1b838f2a).
+This program never links against ffmpeg — it launches it as a separate process —
+which is why the program itself stays MIT.
+
+Two consequences worth knowing before you download:
+
+- The exe is about **48 MB**, and unpacks roughly 98 MB into `%TEMP%` on every
+  launch. Measured cost: **about half a second** of extra startup on an SSD
+  (1.5 s → 2.0 s to a visible window). The first launch after a download is slower
+  because the antivirus scans the new binary.
+- The essentials build has **no SVT-AV1**, so CPU mode falls back to `libaom-av1`,
+  which is considerably slower. To get SVT-AV1 back, download a *full* ffmpeg
+  build and drop its `ffmpeg.exe` into an `ffmpeg` folder next to the exe; it is
+  then picked up automatically, with no configuration.
 
 ## Quality: this is a lossy re-encode
 
@@ -133,8 +181,14 @@ dependency beyond `pywinstyles` (optional, for the themed title bar) and
 
 ```bat
 python -m pip install pyinstaller tkinterdnd2 pywinstyles
+python vendor\fetch_ffmpeg.py
 pyinstaller av1_batch_converter.spec --noconfirm --distpath dist --workpath build
 ```
+
+`vendor\fetch_ffmpeg.py` downloads the pinned ffmpeg build into `vendor\ffmpeg\`
+and checks it against a recorded SHA-256, so the binary is reproducible without
+ever being committed to git. The spec refuses to build if it is missing, rather
+than quietly producing an exe with no ffmpeg inside it.
 
 `build.bat` does the same thing against a dedicated virtualenv and leaves
 `dist\av1_batch_converter.exe`.
@@ -149,4 +203,8 @@ measurement methodology — are in [DEVELOPMENT.md](DEVELOPMENT.md) (Chinese).
 
 ## License
 
-[MIT](LICENSE)
+The program is [MIT](LICENSE).
+
+The bundled ffmpeg binary is **GPLv3**, © the FFmpeg developers, redistributed
+unmodified — see [Bundled ffmpeg](#bundled-ffmpeg) for the licence, build notes
+and the source it was built from.

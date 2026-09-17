@@ -28,14 +28,16 @@
 ## 動作環境
 
 - Windows 10 または 11
-- `PATH` に [ffmpeg](https://ffmpeg.org/download.html)
 - ハードウェア アクセラレーションを使う場合は ffmpeg が扱える GPU
   （AV1 エンコードには新しいカードが必要: RTX 40 シリーズ、RX 7000 シリーズ、Arc 以降）
 
+ffmpeg は **exe に同梱**されているので、追加インストールは不要です。
+詳しくは[同梱の ffmpeg](#同梱の-ffmpeg)を参照してください。
+
 ## 使い方
 
-インストーラーはありません。[Releases](../../releases) から `av1_batch_converter.exe` を
-ダウンロードして実行してください。
+インストーラーも前提条件もありません。[Releases](../../releases) から
+`av1_batch_converter.exe` をダウンロードして実行してください。
 
 ファイルの追加方法はどれでも構いません：
 
@@ -71,6 +73,7 @@
 | 2 | AMD GPU | `av1_amf` | `-quality quality -rc cqp -qp_i 28 -qp_p 28` |
 | 3 | Intel 内蔵 GPU | `av1_qsv` | `-preset 7 -global_quality 28` |
 | 4 | CPU | `libsvtav1` | `-preset 6 -crf 30` |
+| 5 | CPU | `libaom-av1` | `-cpu-used 6 -crf 30` |
 
 全デバイス共通：`-g 240 -movflags +faststart -c:a aac -b:a 128k`
 
@@ -78,8 +81,13 @@
 > それぞれ別の尺度で、数値の意味が違います。似た見た目になるようにエンコーダーごとに
 > 個別に選んだ値です。
 
-SVT-AV1 による CPU エンコードは、GPU エンコードより 1〜2 桁遅いです。あくまで
-フォールバックで、選択されたときはログにも表示されます。
+CPU エンコードは GPU エンコードより 1〜2 桁遅いです。あくまでフォールバックで、
+選択されたときはログにも表示されます。
+
+ソフトウェア エンコーダーを 2 つ挙げているのは、どちらが存在するかが使う ffmpeg 次第だからです。
+SVT-AV1 のほうが大幅に速いので、使えるならそちらが選ばれます。同梱の ffmpeg には
+`libaom-av1` しかないため、素のインストールでは 5 行目になります。4 行目にしたい場合は
+自分でフル版 ffmpeg を用意してください（[同梱の ffmpeg](#同梱の-ffmpeg) 参照）。
 
 エンコーダーを切り替えると、実際に使われる引数がログに再表示されます：
 
@@ -88,6 +96,43 @@ SVT-AV1 による CPU エンコードは、GPU エンコードより 1〜2 桁�
   品質パラメータ: -preset p7 -rc vbr -cq 28 -b:v 0 -tune hq
   共通パラメータ: -g 240 -movflags +faststart -c:a aac -b:a 128k
 ```
+
+## 同梱の ffmpeg
+
+exe は ffmpeg を内蔵しているので、まっさらな Windows でも設定なしで変換できます。
+探す順番は次のとおりで、最初に見つかったものが使われます：
+
+| 順序 | 場所 | 説明 |
+| --- | --- | --- |
+| 1 | exe と同じフォルダの `ffmpeg\ffmpeg.exe` | 自分で置いたものが最優先 |
+| 2 | exe の内部 | 既定 |
+| 3 | `PATH` 上の `ffmpeg` | 上の 2 つが無い場合のみ |
+
+同梱版は `PATH` 上のものより**意図的に優先**されます。PC 全体に入れた ffmpeg は
+忘れられがちで、「自分の環境では動く」という問題のほうが、予測可能な既定値より厄介だからです。
+どれが使われたかはログの最初の 2 行が必ず示します：
+
+```
+ffmpeg: 同梱
+ffmpeg バージョン: ffmpeg version 9.0.1-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers
+```
+
+同梱のバイナリは [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) の essentials ビルド 9.0.1 を
+改変せずに含めたものです。**GPLv3** なので、ライセンスとビルド情報を
+`ffmpeg\LICENSE` と `ffmpeg\README-ffmpeg.txt` として exe 内に同梱しており、対応する
+ソースは [FFmpeg commit bf1b838f2a](https://github.com/FFmpeg/FFmpeg/commit/bf1b838f2a) です。
+本プログラムは ffmpeg にリンクしておらず、別プロセスとして起動するだけなので、
+プログラム本体は MIT のままです。
+
+ダウンロード前に知っておきたいことが 2 点あります：
+
+- exe は約 **48 MB** で、起動のたびに約 98 MB を `%TEMP%` に展開します。実測コストは
+  起動時間**約 0.5 秒**（ウィンドウ表示が 1.5 秒 → 2.0 秒）。ダウンロード直後の初回は
+  ウイルス対策ソフトが新しいバイナリを走査するため、さらに遅くなります。
+- essentials ビルドには **SVT-AV1 が入っていない**ため、CPU モードは `libaom-av1` に
+  フォールバックし、かなり遅くなります。SVT-AV1 を使いたい場合は**フル版** ffmpeg を
+  ダウンロードし、その `ffmpeg.exe` を exe の隣の `ffmpeg` フォルダに置いてください。
+  設定なしで自動的に認識されます。
 
 ## 画質：これは非可逆の再エンコードです
 
@@ -135,8 +180,14 @@ UI は per-monitor DPI aware で、文字とレイアウトはウィンドウの
 
 ```bat
 python -m pip install pyinstaller tkinterdnd2 pywinstyles
+python vendor\fetch_ffmpeg.py
 pyinstaller av1_batch_converter.spec --noconfirm --distpath dist --workpath build
 ```
+
+`vendor\fetch_ffmpeg.py` は固定バージョンの ffmpeg を `vendor\ffmpeg\` にダウンロードし、
+記録済みの SHA-256 で検証します。つまり再現可能で、しかも git にコミットする必要が
+ありません。これが無いと spec はビルドを中止します —— ffmpeg を同梱していない exe を
+黙って作ってしまうより、失敗したほうがましだからです。
 
 `build.bat` は同じ処理を専用の virtualenv で行い、`dist\av1_batch_converter.exe` を残します。
 
@@ -151,4 +202,7 @@ Python 3.13 の注意点：tkinterdnd2 を import する前に
 
 ## ライセンス
 
-[MIT](LICENSE)
+プログラム本体は [MIT](LICENSE) です。
+
+同梱の ffmpeg バイナリは **GPLv3**（© FFmpeg developers）で、改変せずに再配布しています ——
+ライセンス、ビルド情報、対応ソースは[同梱の ffmpeg](#同梱の-ffmpeg)を参照してください。

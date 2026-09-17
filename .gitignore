@@ -7,3 +7,7 @@ _shot_*.png
 _src_*.png
 .tmp-*
 file_version_info.txt
+
+# ffmpeg is ~98 MB and is fetched + hash-verified by vendor/fetch_ffmpeg.py,
+# which build.bat calls. Never commit the binary itself.
+vendor/ffmpeg/

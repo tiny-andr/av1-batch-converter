@@ -4,6 +4,7 @@ import re
 import sys
 import math
 import ctypes
+import shutil
 import subprocess
 import threading
 import uuid
@@ -53,7 +54,7 @@ DEFAULT_THEME = "dark"
 # --------------------------------------------------------------------- localization
 
 APP_TITLE = "AV1 Batch Converter"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 LANGUAGES = ["zh", "ja", "en"]
 LANG_LABELS = {"zh": "中", "ja": "日", "en": "EN"}
@@ -88,7 +89,12 @@ STRINGS = {
         "status_list_cleared": "List cleared",
         "status_loaded_cmdline": "Loaded {n} files from command line",
         "status_cannot_add": "Cannot add files while conversion is running",
-        "log_no_encoder": "No usable encoder found - is ffmpeg on PATH?",
+        "log_no_encoder": "No usable encoder found - none of the listed encoders could start.",
+        "log_ffmpeg_bundled": "ffmpeg: bundled with the program",
+        "log_ffmpeg_beside": "ffmpeg: beside the program ({path})",
+        "log_ffmpeg_path": "ffmpeg: from PATH ({path})",
+        "log_ffmpeg_missing_src": "ffmpeg: not found, neither bundled nor on PATH",
+        "log_ffmpeg_version": "ffmpeg version: {ver}",
         "log_acceleration": "Acceleration: {label}",
         "log_available": "available",
         "log_unavailable": "unavailable",
@@ -109,7 +115,7 @@ STRINGS = {
         "log_initial_folder": "Initial folder argument: {path}",
         "log_done": "Done: {path}",
         "log_failed": "Failed: {path}",
-        "log_ffmpeg_missing": "ffmpeg not found in PATH. Failed: {path}",
+        "log_ffmpeg_missing": "Could not run ffmpeg. Failed: {path}",
         "log_replace_failed": "Failed to replace original file {path}: {err}",
         "log_exception": "Exception: {path}\n{err}",
         "mb_no_files_title": "No files",
@@ -117,7 +123,7 @@ STRINGS = {
         "mb_busy_title": "Busy",
         "mb_busy_msg": "Conversion already running.",
         "mb_no_encoder_title": "No encoder",
-        "mb_no_encoder_msg": "No usable encoder was detected. Check that ffmpeg is on PATH.",
+        "mb_no_encoder_msg": "No usable encoder was detected. Either ffmpeg is missing, or it cannot start any AV1 encoder on this machine.",
         "mb_stopped_title": "Stopped",
         "mb_stopped_msg": "Batch conversion stopped by user.",
         "mb_done_title": "Done",
@@ -162,7 +168,12 @@ STRINGS = {
         "status_list_cleared": "列表已清空",
         "status_loaded_cmdline": "已从命令行载入 {n} 个文件",
         "status_cannot_add": "转换中无法添加文件",
-        "log_no_encoder": "未找到可用的编码器 —— ffmpeg 是否在 PATH 中？",
+        "log_no_encoder": "未找到可用的编码器 —— 列表里的编码器都无法启动。",
+        "log_ffmpeg_bundled": "ffmpeg：随程序自带",
+        "log_ffmpeg_beside": "ffmpeg：与程序同目录（{path}）",
+        "log_ffmpeg_path": "ffmpeg：来自 PATH（{path}）",
+        "log_ffmpeg_missing_src": "ffmpeg：未找到，自带和 PATH 里都没有",
+        "log_ffmpeg_version": "ffmpeg 版本：{ver}",
         "log_acceleration": "加速设备: {label}",
         "log_available": "可用",
         "log_unavailable": "不可用",
@@ -183,7 +194,7 @@ STRINGS = {
         "log_initial_folder": "命令行文件夹参数: {path}",
         "log_done": "完成: {path}",
         "log_failed": "失败: {path}",
-        "log_ffmpeg_missing": "未在 PATH 中找到 ffmpeg。失败: {path}",
+        "log_ffmpeg_missing": "无法运行 ffmpeg。失败: {path}",
         "log_replace_failed": "替换原文件失败 {path}: {err}",
         "log_exception": "异常: {path}\n{err}",
         "mb_no_files_title": "没有文件",
@@ -191,7 +202,7 @@ STRINGS = {
         "mb_busy_title": "忙碌中",
         "mb_busy_msg": "转换已在运行。",
         "mb_no_encoder_title": "没有可用的编码器",
-        "mb_no_encoder_msg": "未检测到可用的编码器，请确认 ffmpeg 已在 PATH 中。",
+        "mb_no_encoder_msg": "未检测到可用的编码器。可能是找不到 ffmpeg，或者这台机器上没有任何 AV1 编码器能启动。",
         "mb_stopped_title": "已停止",
         "mb_stopped_msg": "批量转换已被用户停止。",
         "mb_done_title": "完成",
@@ -236,7 +247,12 @@ STRINGS = {
         "status_list_cleared": "リストをクリアしました",
         "status_loaded_cmdline": "コマンドラインから {n} 件読み込みました",
         "status_cannot_add": "変換中はファイルを追加できません",
-        "log_no_encoder": "使用可能なエンコーダーが見つかりません - ffmpeg は PATH にありますか？",
+        "log_no_encoder": "使用可能なエンコーダーが見つかりません - 一覧のエンコーダーはどれも起動できませんでした。",
+        "log_ffmpeg_bundled": "ffmpeg: 同梱",
+        "log_ffmpeg_beside": "ffmpeg: プログラムと同じ場所（{path}）",
+        "log_ffmpeg_path": "ffmpeg: PATH から（{path}）",
+        "log_ffmpeg_missing_src": "ffmpeg: 見つかりません（同梱・PATH ともになし）",
+        "log_ffmpeg_version": "ffmpeg バージョン: {ver}",
         "log_acceleration": "加速デバイス: {label}",
         "log_available": "使用可能",
         "log_unavailable": "使用不可",
@@ -257,7 +273,7 @@ STRINGS = {
         "log_initial_folder": "コマンドラインのフォルダ引数: {path}",
         "log_done": "完了: {path}",
         "log_failed": "失敗: {path}",
-        "log_ffmpeg_missing": "PATH に ffmpeg が見つかりません。失敗: {path}",
+        "log_ffmpeg_missing": "ffmpeg を実行できませんでした。失敗: {path}",
         "log_replace_failed": "元のファイルの置換に失敗しました {path}: {err}",
         "log_exception": "例外: {path}\n{err}",
         "mb_no_files_title": "ファイルがありません",
@@ -265,7 +281,7 @@ STRINGS = {
         "mb_busy_title": "実行中",
         "mb_busy_msg": "変換はすでに実行中です。",
         "mb_no_encoder_title": "使用可能なエンコーダーがありません",
-        "mb_no_encoder_msg": "使用可能なエンコーダーが検出されませんでした。ffmpeg が PATH にあるか確認してください。",
+        "mb_no_encoder_msg": "使用可能なエンコーダーが検出されませんでした。ffmpeg が見つからないか、この環境で AV1 エンコーダーを起動できない可能性があります。",
         "mb_stopped_title": "停止しました",
         "mb_stopped_msg": "バッチ変換はユーザーにより停止されました。",
         "mb_done_title": "完了",
@@ -327,6 +343,17 @@ ENCODER_BACKENDS = [
         "codec": "libsvtav1",
         "args": ["-preset", "6", "-crf", "30"],
     },
+    {
+        # Second CPU option. The ffmpeg build shipped inside this exe is gyan.dev's
+        # "essentials" variant, which carries every hardware AV1 encoder but not
+        # libsvtav1; it does carry libaom-av1. Listing both means the bundled build
+        # still has a working CPU path, while anyone running against a full ffmpeg
+        # keeps getting SVT-AV1 because it is probed first.
+        "key": "cpu_aom",
+        "label": "CPU (libaom AV1)",
+        "codec": "libaom-av1",
+        "args": ["-cpu-used", "6", "-crf", "30"],
+    },
 ]
 
 BACKENDS_BY_KEY = {backend["key"]: backend for backend in ENCODER_BACKENDS}
@@ -340,10 +367,68 @@ PROBE_INPUT = ["-f", "lavfi", "-i", "testsrc2=s=256x256:r=30", "-frames:v", "2"]
 PROBE_TIMEOUT = 20
 
 
+# --------------------------------------------------------------------- ffmpeg
+
+def _program_dir():
+    """Folder the program lives in.
+
+    A onefile build unpacks itself into a temp folder, so anything that should
+    sit next to the program has to be resolved from the exe's own directory.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _ffmpeg_candidates():
+    program = _program_dir()
+    # 1. Dropped in beside the program by the user: an explicit override.
+    yield os.path.join(program, "ffmpeg", "ffmpeg.exe"), "beside"
+    # 2. Packed into the exe and unpacked to the temp folder for this run.
+    bundle = getattr(sys, "_MEIPASS", None)
+    if bundle:
+        yield os.path.join(bundle, "ffmpeg", "ffmpeg.exe"), "bundled"
+    # 3. The source tree layout, so running the .pyw directly uses the same build.
+    yield os.path.join(program, "vendor", "ffmpeg", "ffmpeg.exe"), "vendor"
+
+
+def resolve_ffmpeg():
+    """Return (command, source).
+
+    source is "beside", "bundled", "vendor", "path" or "missing". Bundled copies
+    win over PATH deliberately: a stale or broken ffmpeg on PATH would otherwise
+    shadow a known-good one that ships with the program.
+    """
+    for path, source in _ffmpeg_candidates():
+        if os.path.isfile(path):
+            return path, source
+    found = shutil.which("ffmpeg")
+    if found:
+        return found, "path"
+    return "ffmpeg", "missing"
+
+
+FFMPEG_CMD, FFMPEG_SOURCE = resolve_ffmpeg()
+
+
+def ffmpeg_version():
+    """First line of `ffmpeg -version`, or "" when it cannot be run."""
+    try:
+        result = subprocess.run(
+            [FFMPEG_CMD, "-hide_banner", "-version"],
+            capture_output=True, text=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.splitlines()[0].strip() if result.stdout else ""
+
+
 def probe_backend(backend):
     """True if the encoder really initializes here (device present and codec supported)."""
     cmd = [
-        "ffmpeg", "-hide_banner", "-loglevel", "error",
+        FFMPEG_CMD, "-hide_banner", "-loglevel", "error",
         *PROBE_INPUT,
         "-c:v", backend["codec"], *backend["args"],
         "-f", "null", "-",
@@ -1030,6 +1115,7 @@ class ConverterGUI:
 
     def _probe_encoders(self):
         """Detect usable encoders, pick the best one, and grey out the rest."""
+        self._log_ffmpeg_source()
         self.encoder_availability = detect_backends()
         available = [b for b in ENCODER_BACKENDS if self.encoder_availability[b["key"]]]
 
@@ -1050,6 +1136,26 @@ class ConverterGUI:
             key = "log_available" if self.encoder_availability[backend["key"]] else "log_unavailable"
             self._log(f"  {backend['label']:<22} {self._t(key)}")
         self._log_encoder_info()
+
+    def _log_ffmpeg_source(self):
+        """Report which ffmpeg is in use and at what version.
+
+        The bundled copy lives in the temp folder a onefile build unpacks to, so
+        its path is noise; the version is what makes a bug report actionable.
+        A copy the user placed themselves, or one found on PATH, is worth naming.
+        """
+        if FFMPEG_SOURCE == "missing":
+            self._log(self._t("log_ffmpeg_missing_src"))
+            return
+        if FFMPEG_SOURCE in ("bundled", "vendor"):
+            self._log(self._t("log_ffmpeg_bundled"))
+        elif FFMPEG_SOURCE == "beside":
+            self._log(self._t("log_ffmpeg_beside", path=FFMPEG_CMD))
+        else:
+            self._log(self._t("log_ffmpeg_path", path=FFMPEG_CMD))
+        version = ffmpeg_version()
+        if version:
+            self._log(self._t("log_ffmpeg_version", ver=version))
 
     def _log_encoder_info(self):
         """Print the encoder and its exact arguments, including the quality settings."""
@@ -1431,7 +1537,7 @@ class ConverterGUI:
         tmp_path = os.path.join(file_dir, tmp_name)
 
         cmd = [
-            "ffmpeg",
+            FFMPEG_CMD,
             "-loglevel", "error",
             "-stats",
             "-i", file_path,

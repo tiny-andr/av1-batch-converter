@@ -1,7 +1,7 @@
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -17,12 +17,12 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'tiny-andr'),
             StringStruct('FileDescription', 'AV1 Batch Converter'),
-            StringStruct('FileVersion', '1.0.0'),
+            StringStruct('FileVersion', '1.0.1'),
             StringStruct('InternalName', 'av1_batch_converter'),
-            StringStruct('LegalCopyright', 'MIT License'),
+            StringStruct('LegalCopyright', 'MIT License. Bundles FFmpeg (GPLv3) by FFmpeg developers.'),
             StringStruct('OriginalFilename', 'av1_batch_converter.exe'),
             StringStruct('ProductName', 'AV1 Batch Converter'),
-            StringStruct('ProductVersion', '1.0.0')
+            StringStruct('ProductVersion', '1.0.1')
           ]
         )
       ]

@@ -165,7 +165,7 @@ def main():
     check("PE version resource present", words is not None, str(words))
     if words:
         ver = "%d.%d.%d.%d" % (words[0], words[1], words[2], words[3])
-        check("PE file version is 1.0.0", ver.startswith("1.0.0"), ver)
+        check("PE file version is 1.0.1", ver.startswith("1.0.1"), ver)
 
     proc = subprocess.Popen([EXE], cwd=os.path.dirname(EXE))
     hwnd = wait_for_window()
