@@ -5,7 +5,7 @@
 一个用来把视频批量转成 AV1 的 Windows 小工具。把文件夹丢进去，选好加速设备，点开始就行。
 加速设备列表不是照着硬件名猜的，而是真的在你机器上跑一遍试编码，所以不会出现"选了某个设备却静默失败"。
 
-![AV1 Batch Converter 深色主题](docs/screenshot-dark.png)
+![AV1 Batch Converter 深色主题](docs/screenshot-dark-zh.png)
 
 ## 为什么要做这个
 
@@ -104,7 +104,7 @@
 标题栏右侧有两个图标按钮。语言按钮在主题按钮左边，显示当前语言（`中` / `日` / `EN`），
 点击按 中文 → 日文 → 英文 循环。初始语言跟随 Windows 界面语言。
 
-![AV1 Batch Converter 浅色主题](docs/screenshot-light.png)
+![AV1 Batch Converter 浅色主题](docs/screenshot-light-zh.png)
 
 两项选择都不会持久化，每次启动都用源码里的默认值。
 

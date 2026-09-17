@@ -343,12 +343,17 @@ Windows 用系统主题绘制、不理会 Tk 配色，深色下会露出一条�
 | `_quiet_toggle_check.py` | **不占屏幕**的验证：窗口 `withdraw()` 后直接调方法切主题/语言 ×N，断言日志一行没长、按钮确实生效、死字符串已清空 | 无（纯文本报告） |
 | `_dpi_check.py` | DPI 缩放：窗口 `withdraw()` 后依次按 96 / 144 / 96 驱动 `apply_dpi_scaling`，断言正文字体、标题字体、图标、按钮 padding、窗口尺寸都跟着变，且状态（文件列表/并发/日志/编码器选择）在重建后保留 | 无（纯文本报告） |
 | `_verify_exe_release.py` | 发布前验收：读 PE 里的版本资源、启动 exe、**PrintWindow** 抓客户区、与上一版已验收截图做墨迹签名比对 | `_shot_release_capture.png` |
-| `_make_docs_shots.py` | 生成 README 用的截图：源码进程内直接调 `_toggle_theme()` 切亮/暗，PrintWindow 抓图，并与 exe 的抓图做比对确保两边渲染一致 | `docs/screenshot-dark.png` / `docs/screenshot-light.png` |
+| `_make_docs_shots.py` | 生成 README 用的截图：**每个语言各出一对（亮/暗）**。源码进程内直接调 `_toggle_language()` / `_toggle_theme()` 切换，PrintWindow 抓图；保存前把界面上每个按钮/标签的实际文案和 `STRINGS[lang]` 逐一比对，**再把截图里按钮内部字形的实际墨迹宽度和 `Font.measure()` 量出来的该语言文案宽度做比对**，确保"字号对了"不只是控件属性对了 | `docs/screenshot-{dark,light}-{zh,ja,en}.png` 共 6 张 |
+| `_ink_width_diag.py` | 当上面那条字形宽度校验失败时用它排查：对每个按钮打印 `Font.measure()` 结果与多个阈值（40/25/15/8）下的墨迹宽度。阈值全一致说明不是抗锯齿问题，而是**CJK 字形的墨迹天然比步进宽度窄**（右边距），属于正常现象 | 无（纯文本报告） |
 | `_shot_exe_themes.py` | 尝试用投递窗口消息（`PostMessage`）点主题按钮抓 exe 的亮色截图。**结论：Tk 会忽略非前台窗口的投递鼠标消息**，此路不通，保留作为记录 | 无 |
+
+> **README 截图必须和 README 的语言一致**（用户 2026-09-17 指出）：英文 README 用英文界面截图、
+> 中文 README 用中文、日文 README 用日文，所以是 3 语言 × 2 主题 = 6 张图，
+> 文件名形如 `docs/screenshot-dark-en.png`。别再只出一份"系统语言"的图给三份 README 共用。
 
 改动配色后跑 `_screenshot_check.py`，改完打包再跑 `_verify_exe.py`、`_verify_exe_enc.py` 和 `_verify_exe_i18n.py`。
 只是改文案/日志这类**不动布局**的改动，跑 `_quiet_toggle_check.py` 就够了，不必惊动屏幕。
-发布前跑 `_verify_exe_release.py`，要重出 README 截图跑 `_make_docs_shots.py`。
+发布前跑 `_verify_exe_release.py`，要重出 README 截图跑 `_make_docs_shots.py`（6 张一次出齐）。
 
 ### 截图但不打扰用户：PrintWindow + WS_EX_NOACTIVATE
 

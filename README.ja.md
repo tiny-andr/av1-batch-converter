@@ -7,7 +7,7 @@
 ハードウェア名から推測するのではなく、実際にこのマシンで試しエンコードして作られるので、
 「選んだのに黙って失敗する」デバイスは出てきません。
 
-![AV1 Batch Converter ダークテーマ](docs/screenshot-dark.png)
+![AV1 Batch Converter ダークテーマ](docs/screenshot-dark-ja.png)
 
 ## なぜ作ったか
 
@@ -117,7 +117,7 @@ SVT-AV1 による CPU エンコードは、GPU エンコードより 1〜2 桁�
 現在の言語（`中` / `日` / `EN`）を表示します。クリックで 中文 → 日本語 → English と
 巡回します。初期言語は Windows の UI 言語に追従します。
 
-![AV1 Batch Converter ライトテーマ](docs/screenshot-light.png)
+![AV1 Batch Converter ライトテーマ](docs/screenshot-light-ja.png)
 
 どちらの選択も保存されないので、起動のたびにソース内の既定値から始まります。
 

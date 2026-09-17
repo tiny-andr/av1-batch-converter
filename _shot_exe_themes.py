@@ -1,13 +1,12 @@
-"""Regenerate the README screenshots from the released exe.
+"""Dead end, kept for the record: clicking the theme button via PostMessage.
 
-Clicks the theme button by *posting* WM_LBUTTONDOWN/WM_LBUTTONUP straight to the
-window's message queue. No SetCursorPos, no mouse_event: the user's cursor never
-moves and the window is never brought to the foreground. PrintWindow renders the
-window even while it is occluded, so the whole run is invisible on screen.
+Tk ignores posted WM_LBUTTONDOWN/WM_LBUTTONUP for a window that is not
+foreground, so the theme never actually toggles and the two captures come out
+identical. Use _make_docs_shots.py instead, which calls the method directly.
 
-The button position is not hard-coded. It is located from the captured image by
-finding the ink clusters in the header band, which also proves the icons really
-rendered.
+This script therefore writes to scratch names and must never be pointed at
+docs/ -- running it would overwrite the real README screenshots with a pair of
+identical dark images.
 """
 
 import ctypes
@@ -21,7 +20,7 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXE = os.path.join(HERE, "dist", "av1_batch_converter.exe")
-DOCS = os.path.join(HERE, "docs")
+SCRATCH = HERE
 
 WM_LBUTTONDOWN, WM_LBUTTONUP = 0x0201, 0x0202
 MK_LBUTTON = 0x0001
@@ -166,7 +165,6 @@ def save_client(img, hwnd, path):
 
 
 def main():
-    os.makedirs(DOCS, exist_ok=True)
     subprocess.run(["taskkill", "/F", "/T", "/IM", "av1_batch_converter.exe"],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1.0)
@@ -211,8 +209,8 @@ def main():
                     if light_full.convert("L").load()[x, y] > 200)
     check("light theme is bright", light_ink > 5000, "%d bright samples" % light_ink)
 
-    w1, h1 = save_client(dark_full, hwnd, os.path.join(DOCS, "screenshot-dark.png"))
-    w2, h2 = save_client(light_full, hwnd, os.path.join(DOCS, "screenshot-light.png"))
+    w1, h1 = save_client(dark_full, hwnd, os.path.join(SCRATCH, "_shot_themes_dark_client.png"))
+    w2, h2 = save_client(light_full, hwnd, os.path.join(SCRATCH, "_shot_themes_light_client.png"))
     check("both shots same size", (w1, h1) == (w2, h2), "%sx%s vs %sx%s" % (w1, h1, w2, h2))
 
     # restore dark so the app is left in its default state, then close

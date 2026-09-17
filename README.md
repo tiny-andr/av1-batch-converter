@@ -6,7 +6,7 @@ A small Windows GUI for batch-converting videos to AV1. Drop in a folder, pick t
 acceleration device you want, hit start. The encoder list is built by actually
 probing your machine, so you never get a device that silently fails.
 
-![AV1 Batch Converter, dark theme](docs/screenshot-dark.png)
+![AV1 Batch Converter, dark theme](docs/screenshot-dark-en.png)
 
 ## Why this exists
 
@@ -115,7 +115,7 @@ The header has two icon buttons. The language button sits to the left of the the
 button and shows the current language (`中` / `日` / `EN`); clicking cycles
 Chinese → Japanese → English. The initial language follows your Windows UI language.
 
-![AV1 Batch Converter, light theme](docs/screenshot-light.png)
+![AV1 Batch Converter, light theme](docs/screenshot-light-en.png)
 
 Neither choice is persisted, so each launch starts from the defaults in the source.
 

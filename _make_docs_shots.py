@@ -1,14 +1,22 @@
-"""Render the README screenshots from the application itself.
+"""Render the README screenshots, one pair per UI language.
 
-The theme is switched by calling ``ConverterGUI._toggle_theme()`` directly
-instead of clicking. Posted WM_LBUTTONDOWN messages are ignored by Tk unless the
-window is foreground, and real synthetic clicks need the foreground plus cursor
-movement, which hijacks the user's mouse. Calling the method exercises the same
-theme rebuild without touching either.
+Each README is written for one language, so it has to show *that* language's UI:
+English README -> English screenshots, and so on. This renders all three pairs
+(zh / ja / en x dark / light) from the application itself.
 
-The window is mapped with WS_EX_NOACTIVATE so it never steals focus, and it is
-captured with PrintWindow, which renders occluded windows. The capture is then
-compared against a capture of the packaged exe to prove both render identically.
+Nothing here touches the user's mouse or the foreground:
+
+* The language is changed by calling ``ConverterGUI._toggle_language()`` and the
+  theme by ``_toggle_theme()``. Posted WM_LBUTTONDOWN messages are ignored by Tk
+  for non-foreground windows, and real synthetic clicks need the foreground plus
+  cursor movement.
+* The window is mapped with ``WS_EX_NOACTIVATE`` so it never takes focus, and
+  captured with ``PrintWindow``, which renders occluded windows.
+
+Because a screenshot that silently shows the wrong language would be worse than
+no screenshot, every render is tied back to real widget text before it is saved:
+the button and label captions are read out of the live widgets and compared with
+the target language's ``STRINGS`` entries.
 """
 
 import ctypes
@@ -26,6 +34,28 @@ DOCS = os.path.join(HERE, "docs")
 EXE_CAPTURE = os.path.join(HERE, "_shot_release_capture.png")
 CLIENT_OFFSET = (8, 31)
 CLIENT_SIZE = (900, 650)
+
+# Widget attribute -> the STRINGS key whose text it must be showing.
+CAPTIONS = (
+    ("add_folder_btn", "add_folder"),
+    ("add_files_btn", "add_files"),
+    ("load_list_btn", "load_list"),
+    ("remove_btn", "remove_selected"),
+    ("clear_btn", "clear_list"),
+    ("start_btn", "start_conversion"),
+    ("stop_btn", "stop_conversion"),
+    ("concurrent_label", "max_concurrent"),
+    ("encoder_label", "encoder"),
+)
+
+# The subset whose rendered pixel width is measured back out of the screenshot.
+TOOLBAR = (
+    ("add_folder_btn", "add_folder"),
+    ("add_files_btn", "add_files"),
+    ("load_list_btn", "load_list"),
+    ("remove_btn", "remove_selected"),
+    ("clear_btn", "clear_list"),
+)
 
 GWL_EXSTYLE = -20
 WS_EX_NOACTIVATE = 0x08000000
@@ -56,8 +86,8 @@ def find_by_title(require_visible=True, timeout=20.0):
     """Return the framed OS window for the app.
 
     root.winfo_id() gives Tk's inner window; GetParent on it is Tk's wrapper,
-    which reports a client-sized rect and has no caption. The window that
-    carries the title bar is the one enumerated by title, so look it up there.
+    which reports a client-sized rect and has no caption. The window carrying the
+    title bar is the one enumerated by title, so look it up there.
     """
     found = []
 
@@ -121,9 +151,14 @@ def grab(hwnd):
     return Image.frombuffer("RGBA", (w, h), buf, "raw", "BGRA", 0, 1).convert("RGB")
 
 
+def client_crop(img):
+    return img.crop((CLIENT_OFFSET[0], CLIENT_OFFSET[1],
+                     CLIENT_OFFSET[0] + CLIENT_SIZE[0],
+                     CLIENT_OFFSET[1] + CLIENT_SIZE[1]))
+
+
 def mean_luma(img):
-    grey = img.convert("L")
-    px = list(grey.getdata())
+    px = list(img.convert("L").getdata())
     return sum(px[::13]) / float(len(px[::13]))
 
 
@@ -156,6 +191,51 @@ def pump(root, seconds):
         time.sleep(0.02)
 
 
+def window_origin(hwnd):
+    rect = wt.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(rect))
+    return rect.left, rect.top
+
+
+def widget_rect(origin, widget):
+    """Image-space rect of a widget, from Tk's own screen coordinates."""
+    x = widget.winfo_rootx() - origin[0]
+    y = widget.winfo_rooty() - origin[1]
+    return x, y, widget.winfo_width(), widget.winfo_height()
+
+
+def text_ink_width(img, rect, inset=4):
+    """Width in pixels of the glyphs drawn inside ``rect``.
+
+    Inset past the button border so only the caption contributes ink.
+    """
+    x, y, w, h = rect
+    crop = img.crop((x + inset, y + inset, x + w - inset, y + h - inset)).convert("L")
+    px = list(crop.getdata())
+    cw, ch = crop.size
+    sample = sorted(px)
+    bg = sample[len(sample) // 2]
+    cols = [False] * cw
+    for yy in range(ch):
+        row = yy * cw
+        for xx in range(cw):
+            if abs(px[row + xx] - bg) > 40:
+                cols[xx] = True
+    nz = [i for i, v in enumerate(cols) if v]
+    return (nz[-1] - nz[0] + 1) if nz else 0
+
+
+def switch_language(app, root, mod, target):
+    """Cycle the language button until the UI is in ``target``."""
+    for _ in range(len(mod.LANGUAGES) + 1):
+        if app.language == target:
+            pump(root, 0.5)
+            return True
+        app._toggle_language()
+        pump(root, 0.5)
+    return False
+
+
 def main():
     os.makedirs(DOCS, exist_ok=True)
     mod = load_app_module()
@@ -171,64 +251,119 @@ def main():
         root.destroy()
         return report()
 
-    # Appear without taking focus from whatever the user is doing.
     ex = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
     user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex | WS_EX_NOACTIVATE)
 
     root.geometry("+40+40")
     root.deiconify()
-    # The startup encoder probe takes a few seconds and appends its result to
-    # the log box; wait it out so the shot matches the exe.
+    # The startup encoder probe takes a few seconds and appends its result to the
+    # log box; wait it out so every shot has the same settled content.
     pump(root, 11.0)
 
-    ex, ey, ew, eh = client_offset(hwnd)
-    client = (ew - 2 * ex, eh - ex - ey)      # 8px side borders, 31px caption, 8px bottom
-    check("client-area offset matches the reference shots", (ex, ey) == CLIENT_OFFSET,
-          "offset (%d, %d)" % (ex, ey))
+    ox, oy, ow, oh = client_offset(hwnd)
+    client = (ow - 2 * ox, oh - ox - oy)
+    check("client-area offset is %s" % (CLIENT_OFFSET,), (ox, oy) == CLIENT_OFFSET,
+          "offset (%d, %d)" % (ox, oy))
     check("client area is %dx%d" % CLIENT_SIZE, client == CLIENT_SIZE,
           "client %dx%d" % client)
     check("window is not foreground", user32.GetForegroundWindow() != hwnd)
 
-    dark = grab(hwnd)
-    dark.save(os.path.join(HERE, "_shot_docs_dark_full.png"))
+    print("      initial language from the system: %s" % app.language)
+    initial_lang = app.language
 
-    app._toggle_theme()
-    pump(root, 1.5)
-    light = grab(hwnd)
-    light.save(os.path.join(HERE, "_shot_docs_light_full.png"))
+    # ttk.Button draws with the font configured on the TButton style, so measure
+    # the captions with that exact font to get the expected glyph widths.
+    import tkinter.font as tkfont
+    style = mod.ttk.Style(root)
+    btn_font = tkfont.Font(root=root, font=style.lookup("TButton", "font"))
 
-    app._toggle_theme()
-    pump(root, 1.0)
-    back_to_dark = grab(hwnd)
+    shots = {}
+    for lang in mod.LANGUAGES:
+        check("UI switched to %s" % lang, switch_language(app, root, mod, lang),
+              "app.language = %s" % app.language)
 
-    check("dark render is dark", mean_luma(dark) < 90, "mean luma %.1f" % mean_luma(dark))
-    check("light render is light", mean_luma(light) > 170, "mean luma %.1f" % mean_luma(light))
-    check("toggle round-trips back to dark",
-          abs(mean_luma(back_to_dark) - mean_luma(dark)) < 3.0,
-          "%.1f vs %.1f" % (mean_luma(back_to_dark), mean_luma(dark)))
+        # The conclusive check: the captions on screen really are this language's.
+        mismatches = []
+        for attr, key in CAPTIONS:
+            shown = str(getattr(app, attr).cget("text"))
+            want = mod.STRINGS[lang][key]
+            if shown != want:
+                mismatches.append("%s: %r != %r" % (attr, shown, want))
+        check("%s: visible captions match STRINGS[%s]" % (lang, lang), not mismatches,
+              "; ".join(mismatches[:3]))
 
-    if os.path.isfile(EXE_CAPTURE):
-        exe = Image.open(EXE_CAPTURE).convert("RGB")
-        exe = exe.crop((CLIENT_OFFSET[0], CLIENT_OFFSET[1],
-                        CLIENT_OFFSET[0] + CLIENT_SIZE[0], CLIENT_OFFSET[1] + CLIENT_SIZE[1]))
-        src_dark = dark.crop((CLIENT_OFFSET[0], CLIENT_OFFSET[1],
-                              CLIENT_OFFSET[0] + CLIENT_SIZE[0], CLIENT_OFFSET[1] + CLIENT_SIZE[1]))
-        d = distance(signature(src_dark), signature(exe))
-        check("source and exe render the dark theme identically", d < 0.05,
+        dark = grab(hwnd)
+        check("%s: dark render is dark" % lang, mean_luma(dark) < 90,
+              "mean luma %.1f" % mean_luma(dark))
+
+        # The pixels must agree with those captions: the glyphs actually drawn
+        # inside each toolbar button should be as wide as Tk measures that string.
+        #
+        # Font.measure() sums advance widths, which include each glyph's side
+        # bearings, while the ink extent counts only painted pixels -- and CJK
+        # glyphs leave more side bearing than Latin ones. So the drawn width is
+        # allowed to fall a little short, proportionally. A caption from the
+        # wrong language is off by 30% or more, so this still catches it.
+        origin = window_origin(hwnd)
+        width_errors = []
+        for attr, key in TOOLBAR:
+            widget = getattr(app, attr)
+            drawn = text_ink_width(dark, widget_rect(origin, widget))
+            expected = btn_font.measure(mod.STRINGS[lang][key])
+            tolerance = max(2, round(0.06 * expected))
+            if abs(drawn - expected) > tolerance:
+                width_errors.append("%s drawn %d vs measured %d (tol %d)"
+                                    % (key, drawn, expected, tolerance))
+        check("%s: drawn glyph widths match the captions" % lang, not width_errors,
+              "; ".join(width_errors[:3]))
+
+        app._toggle_theme()
+        pump(root, 1.2)
+        light = grab(hwnd)
+        check("%s: light render is light" % lang, mean_luma(light) > 170,
+              "mean luma %.1f" % mean_luma(light))
+
+        app._toggle_theme()
+        pump(root, 1.2)
+        back = grab(hwnd)
+        d = distance(signature(client_crop(back)), signature(client_crop(dark)))
+        check("%s: theme round-trips back to dark" % lang, d < 0.05,
               "ink distance %.3f" % d)
 
-    dark.crop((CLIENT_OFFSET[0], CLIENT_OFFSET[1],
-               CLIENT_OFFSET[0] + CLIENT_SIZE[0], CLIENT_OFFSET[1] + CLIENT_SIZE[1])
-              ).save(os.path.join(DOCS, "screenshot-dark.png"))
-    light.crop((CLIENT_OFFSET[0], CLIENT_OFFSET[1],
-                CLIENT_OFFSET[0] + CLIENT_SIZE[0], CLIENT_OFFSET[1] + CLIENT_SIZE[1])
-               ).save(os.path.join(DOCS, "screenshot-light.png"))
+        client_crop(dark).save(os.path.join(DOCS, "screenshot-dark-%s.png" % lang))
+        client_crop(light).save(os.path.join(DOCS, "screenshot-light-%s.png" % lang))
+        shots[lang] = (dark, light)
+        dark.save(os.path.join(HERE, "_shot_docs_dark_%s_full.png" % lang))
+        light.save(os.path.join(HERE, "_shot_docs_light_%s_full.png" % lang))
 
-    for name in ("screenshot-dark.png", "screenshot-light.png"):
-        path = os.path.join(DOCS, name)
-        img = Image.open(path)
-        check("docs/%s is %dx%d" % (name, CLIENT_SIZE[0], CLIENT_SIZE[1]),
-              img.size == CLIENT_SIZE, str(img.size))
+    # The three languages all render the same layout, so a caption swap is the
+    # only reason their captures should differ -- but they must differ.
+    distinct = len({mod.STRINGS[l]["add_folder"] for l in mod.LANGUAGES})
+    check("the three languages have distinct captions", distinct == 3,
+          "%d distinct add_folder strings" % distinct)
+
+    sigs = {l: signature(client_crop(shots[l][0])) for l in mod.LANGUAGES}
+    for i, a in enumerate(mod.LANGUAGES):
+        for b in mod.LANGUAGES[i + 1:]:
+            d = distance(sigs[a], sigs[b])
+            check("%s and %s renders differ" % (a, b), d > 0.10,
+                  "ink distance %.3f" % d)
+
+    # The packaged exe starts in the system language, so it is a fair reference
+    # for that one language only. Read it before the loop changes anything.
+    ref_lang = initial_lang
+    if os.path.isfile(EXE_CAPTURE) and ref_lang in shots:
+        exe = client_crop(Image.open(EXE_CAPTURE).convert("RGB"))
+        d = distance(signature(exe), signature(client_crop(shots[ref_lang][0])))
+        check("source and exe render the %s dark theme identically" % ref_lang,
+              d < 0.05, "ink distance %.3f" % d)
+
+    for lang in mod.LANGUAGES:
+        for theme in ("dark", "light"):
+            name = "screenshot-%s-%s.png" % (theme, lang)
+            img = Image.open(os.path.join(DOCS, name))
+            check("docs/%s is %dx%d" % (name, CLIENT_SIZE[0], CLIENT_SIZE[1]),
+                  img.size == CLIENT_SIZE, str(img.size))
 
     try:
         app._stop()
