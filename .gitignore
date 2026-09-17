@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+build/
+dist/
+_build_out.txt
+_shot_*.png
+_src_*.png
+.tmp-*
+file_version_info.txt

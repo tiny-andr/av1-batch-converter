@@ -1,0 +1,12 @@
+* text=auto
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+*.py text
+*.pyw text
+*.md text
+*.json text
+*.spec text
+*.txt text
